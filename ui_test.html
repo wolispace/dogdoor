@@ -1,0 +1,63 @@
+<html>
+  <head>
+    <style>
+      body {
+        background-color: darkslategray;
+        font-family: Arial, sans-serif;
+      }
+      .button {
+        position: relative;
+        width: 100px;
+        height: 200px;
+        margin: 50px auto;
+      }
+      .hole {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        background-color: black;
+        border-radius: 10px;
+
+      }
+      .door {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        background-color: slateblue;
+        border-radius: 10px;
+        transition: transform 0.5s ease-in-out;
+      }
+      .open {
+        transform: translateX(-100%);
+      }
+      .closed {
+        transform: rotateY(-180deg);
+      }
+    </style>
+    <script>
+      function toggleDoor() {
+        const door = document.querySelector('.door');
+        if (door.classList.contains('closed')) {
+          door.classList.remove('closed');
+          door.classList.add('open');
+        } else {
+          door.classList.remove('open');
+          door.classList.add('closed');
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        const button = document.querySelector('.button');
+        button.addEventListener('click', toggleDoor);
+      });
+    </script>
+  </head>
+<body>
+  <div class="button">
+    <div class="hole">
+    </div>
+    <div class="door closed">
+    </div>  
+  </div>
+</body>
+</html>
