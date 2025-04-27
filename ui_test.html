@@ -3,28 +3,34 @@
     <style>
       body {
         background-color: darkslategray;
-        font-family: Arial, sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+
       }
       .button {
         position: relative;
         width: 100px;
-        height: 200px;
-        margin: 50px auto;
+        height: 100px;
+        cursor: hand;
       }
       .hole {
         position: absolute;
         width: 100%;
         height: 100%;
-        background-color: black;
+        background-color: rgba(0,0,0,0.8);
         border-radius: 10px;
-
       }
       .door {
         position: absolute;
         width: 100%;
         height: 100%;
-        background-color: slateblue;
+        background-color: rgb(171, 113, 75);
         border-radius: 10px;
+        border-top: 1px solid white;
+        border-left: 1px solid rgba(255,255,255,0.5);
+        border-bottom: 1px solid rgba(0,0,0,0.8);
+        border-right: 1px solid rgba(0,0,0,0.5);
         transition: transform 0.5s ease-in-out;
       }
       .open {
@@ -35,20 +41,68 @@
       }
     </style>
     <script>
-      function toggleDoor() {
-        const door = document.querySelector('.door');
-        if (door.classList.contains('closed')) {
-          door.classList.remove('closed');
-          door.classList.add('open');
-        } else {
-          door.classList.remove('open');
-          door.classList.add('closed');
-        }
-      }
+      class Door {
+        url = 'http://localhost:84/door_state'; // URL to fetch the door state
+
+        constructor() {
+          this.button = document.querySelector('.button');
+          this.door = document.querySelector('.door');
+          this.getState();
+        };
+
+        getState() {
+          const data = fetch(this.url)
+            .then(response => response.json())
+            .then(data => {
+              this.setState(data.state);
+            })
+            .catch(error => {
+              console.error('Error fetching door state:', error);
+            });
+        };
+
+        setState(state) {
+          this.state = state;
+          this.showState();
+        };
+
+        showState() {
+          if (this.state) {
+            this.open();
+          } else {
+            this.close();
+          }
+        };
+
+        open() {
+          //this.state = true;
+          this.door.classList.remove('closed');
+          this.door.classList.add('open');
+        };
+
+        close() {
+          //this.state = false;
+          this.door.classList.remove('open');
+          this.door.classList.add('closed');
+        };
+
+        toggle() {
+          this.state = !this.state;
+          this.showState();
+        };
+      };
 
       document.addEventListener('DOMContentLoaded', () => {
+        const door = new Door();
         const button = document.querySelector('.button');
-        button.addEventListener('click', toggleDoor);
+        button.addEventListener('click', () => door.toggle());
+        // use fetch() to retrieve current state and set it
+        const currentState = true; //simulate the door is open;
+        if (currentState) {
+          door.open();
+        } else {
+          door.close();
+        }
       });
     </script>
   </head>
