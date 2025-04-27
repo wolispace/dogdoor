@@ -61,6 +61,24 @@
             });
         };
 
+        writeState() {
+          const data = { state: this.state };
+          fetch(this.url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+          })
+          .then(response => response.json())
+          .then(reply => {
+            console.log('State sent successfully:', data, reply);
+          })
+          .catch(error => {
+            console.error('Error updating door state:', error);
+          });
+        };
+
         setState(state) {
           this.state = state;
           this.showState();
@@ -89,6 +107,7 @@
         toggle() {
           this.state = !this.state;
           this.showState();
+          this.writeState();
         };
       };
 
