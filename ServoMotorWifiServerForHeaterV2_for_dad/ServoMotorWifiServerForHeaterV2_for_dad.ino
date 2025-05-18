@@ -30,6 +30,9 @@ https://www.jaycar.com.au/7805-5v-1a-voltage-regulator-to-220-case/p/ZV1505?srsl
 
 output tab is one thing, Serial Monitor tab is another. Watch this one for web server output like ip:
 http://192.168.86.30
+
+needs /api for now
+http://192.168.86.250/hi
  
  */
 
@@ -65,29 +68,16 @@ WiFiServer server(80);
 void setup()
 {
     Serial.begin(115200);
-    Serial.println('setup');
-    myservo.attach(servoPin);  // Attach the servo to the specified pin
-
     delay(10);
-
-    // We start by connecting to a WiFi network
-
-    Serial.println();
-    Serial.println();
-    Serial.print("Connecting to ");
-    Serial.println(ssid);
-
-    WiFi.begin(ssid, password);
+    myservo.attach(servoPin);  // Attach the servo to the specified pin
+    WiFi.begin(ssid, password); // We start by connecting to a WiFi network
 
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
         Serial.print(".");
     }
 
-    Serial.println("");
-    Serial.println("WiFi connected.");
-    Serial.println("IP address: ");
-    Serial.println(WiFi.localIP());
+    Serial.println("\nConnected to " + String(ssid) + " " + WiFi.localIP().toString());
     
     server.begin();
 
