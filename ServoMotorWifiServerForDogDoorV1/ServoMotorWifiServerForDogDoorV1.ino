@@ -36,10 +36,8 @@ http://192.168.86.250/hi
 // #include <vector>
 
 Servo myservo;  // Create a servo object
-int homePosition = 90;
-int buttonPressPosition = 43;
-int defaultDurationInMins = 20;
-//int currentPosition = homePosition; 
+int openPosition = 180;
+int closedPosition = 0;
 bool currentState = false;
 
 const int servoPin = 21;  // Define the GPIO pin connected to the servo signal wire
@@ -47,17 +45,8 @@ const int servoPin = 21;  // Define the GPIO pin connected to the servo signal w
 const char* ssid = "Marmalade";
 const char* password = "100%Minnie!!";
 
-struct Event {
-  bool newState;
-  unsigned long timeToChange;
-  bool hasFired;
-};
-
 String serverAddress;
-bool status;
 
-Event currentPendingEvent = {true, 0, true};
-unsigned long timeOfMostRecentOn = 0;
 
 WiFiServer server(80);
 
@@ -78,83 +67,13 @@ void setup()
     
     server.begin();
 
-    currentPendingEvent ;
+    int currentPos = myservo.read();
+    Serial.print("Current pos = ");
+    Serial.println(currentPos);
+    Serial.println("state: "+ String(currentState));
 }
 
-void loop(){
-  WiFiClient client = server.available();   // listen for incoming clients
 
-  int newPosition = -1;
-
-  if (client) {                             // if you get a client,
-    Serial.println("New Client.");          // print a message out the serial port
-    String currentLine = "";                // make a String to hold incoming data from the client
-    bool wasApiRequest = false;
-    while (client.connected()) {            // loop while the client's connected
-      if (client.available()) {             // if there's bytes to read from the client,
-        char c = client.read();             // read a byte, then
-        if (c == '\n') {                    // if the byte is a newline character
-          // if the current line is blank, you got two newline characters in a row.
-          // that's the end of the client HTTP request, so send a response:
-          if (currentLine.length() == 0) {
-            if (!wasApiRequest) {
-              sendHtmlResponse(client);
-            } else {
-              sendJsonResponse(client);
-            }
-            // break out of the while loop:
-            break;
-          } else {
-            if (currentLine.indexOf("GET /api/") != -1) {
-              wasApiRequest = true;
-              Serial.println("currentLine: [" + currentLine + "]");    
-              // Ensure only the actual request line is processed (truncate at first space)
-              int spaceIndex = currentLine.indexOf(" HTTP");
-              if (spaceIndex != -1) {
-                currentLine = currentLine.substring(0, spaceIndex); // Remove everything after first space
-              }
-              Serial.println("currentLine: [" + currentLine + "]"); 
-
-              String state = getParameter(currentLine, "state");
-              String time = getParameter(currentLine, "time");
-
-              Serial.println("State: " + state);
-              Serial.println("Time: " + time);
-              currentState = state;
-            }
-            currentLine = "";
-          }
-        } else if (c != '\r') {  // if you got anything else but a carriage return character,
-          currentLine += c;      // add it to the end of the currentLine
-        }        
-      } else {
-        sendHtmlResponse(client);
-      }
-    }
-    // close the connection:
-    client.stop();
-    Serial.println("Client Disconnected.");
-  }
-
-
-
-
-  // process the pending event if it's time
-  if (!currentPendingEvent.hasFired & millis() >= currentPendingEvent.timeToChange) {
-    if (currentPendingEvent.newState != currentState) {
-      newPosition = buttonPressPosition;
-    }
-    currentPendingEvent.hasFired = true;
-  }
-
-  // Move the servo to the new position if a valid new position was received
-  if (newPosition != -1 && newPosition != homePosition) {
-    myservo.write(newPosition); 
-    delay(600); 
-    myservo.write(homePosition); 
-    currentState = !currentState;
-  }
-}
 
 // returns a query param eg state=true as a string
 String getParameter(String query, String param) {
@@ -168,8 +87,8 @@ String getParameter(String query, String param) {
   return query.substring(paramStart, paramEnd);
 }
 
-
 void sendJsonResponse(WiFiClient &client) {
+   Serial.println("Send json");
   client.println("HTTP/1.1 200 OK");
   client.println("Content-type:application/json");
   client.println();
@@ -179,6 +98,7 @@ void sendJsonResponse(WiFiClient &client) {
 // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
 // and a content-type so the client knows what's coming, then a blank line:
 void sendHtmlResponse(WiFiClient &client) {
+  Serial.println("Send html");
   client.println("HTTP/1.1 200 OK");
   client.println("Content-Type: text/html");
   client.println("Connection: close");
@@ -189,91 +109,88 @@ void sendHtmlResponse(WiFiClient &client) {
   client.println("<html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\"></head>");
   client.println(style);
 
-  String script = "<script> \
-      class Door { \
+  String script = "<script>                         \
+      class Door {                                  \
         url = 'http://" + serverAddress + "/api/';  \
  \
-        constructor() { \
+        constructor() {                                    \
           this.button = document.querySelector('.button'); \
-          this.door = document.querySelector('.door'); \
-          this.getState(); \
-        }; \
+          this.door = document.querySelector('.door');     \
+          this.getState();                                 \
+          this.showState();                                \
+        };                                                 \
  \
-        getState() { \
-          const data = fetch(this.url) \
+        getState() {                           \
+          const data = fetch(this.url)         \
             .then(response => response.json()) \
-            .then(data => { \
-              this.setState(data.state); \
-            }) \
-            .catch(error => { \
+            .then(data => {                    \
+              console.log(data);               \
+              this.setState(data.state);       \
+            })                                 \
+            .catch(error => {                                     \
               console.error('Error fetching door state:', error); \
-            }); \
-        }; \
+            });                                                   \
+            this.showState();                                     \
+        };                                                        \
  \
-        writeState() { \
-          const data = { state: this.state }; \
+        writeState() {                               \
+          const data = { state: this.state };        \
           fetch(this.url + `?state=${this.state}`, { \
-            method: 'GET', \
-            headers: { \
-              'Content-Type': 'application/json' \
-            }, \
-          }) \
-          .then(response => response.json()) \
-          .then(reply => { \
+            method: 'GET',                           \
+            headers: {                               \
+              'Content-Type': 'application/json'     \
+            },                                       \
+          })                                         \
+          .then(response => response.json())         \
+          .then(reply => {                                       \
             console.log('State sent successfully:', data, reply); \
-          }) \
-          .catch(error => { \
+          })                                                      \
+          .catch(error => {                                     \
             console.error('Error updating door state:', error); \
-          }); \
-        }; \
+          });                                                   \
+        };                                                      \
  \
-        setState(state) { \
-          this.state = state; \
-          this.showState(); \
-        }; \
+        setState(state) {               \
+          this.state = parseInt(state); \
+          this.showState();             \
+        };                              \
  \
-        showState() { \
+        showState() {       \
           if (this.state) { \
-            this.open(); \
-          } else { \
-            this.close(); \
-          } \
-        }; \
+            this.open();    \
+          } else {          \
+            this.close();   \
+          }                 \
+        };                  \
  \
-        open() { \
-          /*this.state = true;*/ \
+        open() {                                \
+          /*this.state = true;*/                \
           this.door.classList.remove('closed'); \
-          this.door.classList.add('open'); \
-        }; \
+          this.door.classList.add('open');      \
+        };                                      \
  \
-        close() { \
-          /*this.state = false;*/  \
+        close() {                             \
+          /*this.state = false;*/             \
           this.door.classList.remove('open'); \
-          this.door.classList.add('closed'); \
-        }; \
+          this.door.classList.add('closed');  \
+        };                                    \
  \
-        toggle() { \
+        toggle() {                  \
           this.state = !this.state; \
-          this.showState(); \
-          this.writeState(); \
-        }; \
-      }; \
+          this.showState();         \
+          this.writeState();        \
+        };                          \
+      };                            \
  \
-      document.addEventListener('DOMContentLoaded', () => { \
-        const door = new Door(); \
-        const button = document.querySelector('.button'); \
+      document.addEventListener('DOMContentLoaded', () => {    \
+        const door = new Door();                               \
+        const button = document.querySelector('.button');      \
         button.addEventListener('click', () => door.toggle()); \
-        /* use fetch() to retrieve current state and set it */\
-        const currentState = true; /* simulate the door is open; */ \
-        if (currentState) { \
-          door.open(); \
-        } else { \
-          door.close(); \
-        } \
-      }); \
+        setInterval(() => door.getState(), 3000);             \
+      });                                                      \
 </script>";
   client.println(script);
-  client.println("<body><body> \
+  client.println("<body> \
   <div class='button'> \
     <div class='hole'> \
     </div> \
@@ -283,6 +200,67 @@ void sendHtmlResponse(WiFiClient &client) {
 </body> \
 </html>");
 
-  client.stop();  // Close the connection
 }
 
+void handleClient(WiFiClient client) {
+  Serial.println("New Client."); 
+  Serial.println("state: "+ String(currentState)); 
+  String currentLine = "";    
+  bool wasApiRequest = false;  
+  unsigned long startTime = millis();
+
+  while (client.connected()) {  
+    if (millis() - startTime > 500) {  // Timeout after .5 seconds
+      Serial.println("Timeout waiting for client data.");
+      break;
+    }
+    
+    if (client.available()) {  
+      char c = client.read();  
+      
+      if (c == '\n') {  
+        if (currentLine.length() == 0) {  
+          if (!wasApiRequest) {
+            sendHtmlResponse(client);
+          } else {
+            sendJsonResponse(client);
+          }
+          break;
+        } else {  
+          if (currentLine.indexOf("GET /api/") != -1) {
+            wasApiRequest = true;  
+            int spaceIndex = currentLine.indexOf(" HTTP");
+            if (spaceIndex != -1) {
+              currentLine = currentLine.substring(0, spaceIndex);  
+            }
+            Serial.println("Request Line: [" + currentLine + "]");  
+
+            String state = getParameter(currentLine, "state");
+            if (!state.isEmpty()) { 
+              String time = getParameter(currentLine, "time");
+
+              Serial.println("set new state: " + state);
+              //Serial.println("set new time: " + time);
+              currentState = state == "true";
+            }
+          }
+          currentLine = "";  
+        }
+      } else if (c != '\r') {  
+        currentLine += c;  
+      }  
+    }
+  }
+  client.flush();
+  delay(10);
+  client.stop();  
+  Serial.println("Client Disconnected.");
+  Serial.println("state: "+ String(currentState)); 
+}
+
+void loop() {
+  WiFiClient client = server.available();
+  if (client) {
+    handleClient(client);
+  }
+}
