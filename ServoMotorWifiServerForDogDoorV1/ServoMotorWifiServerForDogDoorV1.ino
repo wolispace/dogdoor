@@ -36,8 +36,8 @@ http://192.168.86.250/hi
 // #include <vector>
 
 Servo myservo;  // Create a servo object
-int openPosition = 180;
-int closedPosition = 0;
+int openPosition = 179;
+int closedPosition = 1;
 bool currentState = false;
 
 const int servoPin = 21;  // Define the GPIO pin connected to the servo signal wire
@@ -88,7 +88,7 @@ String getParameter(String query, String param) {
 }
 
 void sendJsonResponse(WiFiClient &client) {
-   Serial.println("Send json");
+  //Serial.println("Send json");
   client.println("HTTP/1.1 200 OK");
   client.println("Content-type:application/json");
   client.println();
@@ -98,7 +98,7 @@ void sendJsonResponse(WiFiClient &client) {
 // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
 // and a content-type so the client knows what's coming, then a blank line:
 void sendHtmlResponse(WiFiClient &client) {
-  Serial.println("Send html");
+  //Serial.println("Send html");
   client.println("HTTP/1.1 200 OK");
   client.println("Content-Type: text/html");
   client.println("Connection: close");
@@ -132,6 +132,9 @@ void sendHtmlResponse(WiFiClient &client) {
             });                                                   \
             this.showState();                                     \
         };                                                        \
+        setPos(pos) { \
+          const data = fetch(this.url + `?pos=${pos}`); \
+        } \
  \
         writeState() {                               \
           const data = { state: this.state };        \
@@ -186,7 +189,7 @@ void sendHtmlResponse(WiFiClient &client) {
         const door = new Door();                               \
         const button = document.querySelector('.button');      \
         button.addEventListener('click', () => door.toggle()); \
-        setInterval(() => door.getState(), 3000);             \
+        setInterval(() => door.getState(), 30000);             \
       });                                                      \
 </script>";
   client.println(script);
@@ -203,8 +206,7 @@ void sendHtmlResponse(WiFiClient &client) {
 }
 
 void handleClient(WiFiClient client) {
-  Serial.println("New Client."); 
-  Serial.println("state: "+ String(currentState)); 
+  Serial.println("New Client. state: "+ String(currentState)); 
   String currentLine = "";    
   bool wasApiRequest = false;  
   unsigned long startTime = millis();
@@ -235,6 +237,14 @@ void handleClient(WiFiClient client) {
             }
             Serial.println("Request Line: [" + currentLine + "]");  
 
+            String pos = getParameter(currentLine, "pos");
+            if (!pos.isEmpty()) {
+              int newPos = atoi(pos.c_str()); // Convert string to integer
+              myservo.write(newPos);
+              delay(500);
+              Serial.println("set new pos: " + String(newPos));
+            }
+
             String state = getParameter(currentLine, "state");
             if (!state.isEmpty()) { 
               String time = getParameter(currentLine, "time");
@@ -242,6 +252,14 @@ void handleClient(WiFiClient client) {
               Serial.println("set new state: " + state);
               //Serial.println("set new time: " + time);
               currentState = state == "true";
+              if (currentState) {
+                myservo.write(openPosition);
+                Serial.println("set new pos: " + String(openPosition));
+              } else {
+                myservo.write(closedPosition);
+                 Serial.println("set new pos: " + String(closedPosition));
+              }
+               delay(10);
             }
           }
           currentLine = "";  
@@ -254,8 +272,7 @@ void handleClient(WiFiClient client) {
   client.flush();
   delay(10);
   client.stop();  
-  Serial.println("Client Disconnected.");
-  Serial.println("state: "+ String(currentState)); 
+  Serial.println("Client Disconnected. state: "+ String(currentState));
 }
 
 void loop() {
