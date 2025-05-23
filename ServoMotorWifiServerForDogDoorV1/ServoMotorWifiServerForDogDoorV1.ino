@@ -1,33 +1,15 @@
 /*
- WiFi Web Server LED Blink
+ WiFi Web Server control a servo motor
 
- A simple web server that lets you blink an LED via the web.
- This sketch will print the IP address of your WiFi Shield (once connected)
- to the Serial monitor. From there, you can open that address in a web browser
- to turn on and off the LED on pin 5.
-
- If the IP address of your shield is yourAddress:
- http://yourAddress/H turns the LED on
- http://yourAddress/L turns it off
-
- This example is written for a network using WPA2 encryption. For insecure
- WEP or WPA, change the Wifi.begin() call and use Wifi.setMinSecurity() accordingly.
-
- Circuit:
- * WiFi shield attached
- * LED attached to pin 5
-
- created for arduino 25 Nov 2012
- by Tom Igoe
-
-ported for sparkfun esp32 
-31.01.2017 by Jan Hendrik Berlin
 
 output tab is one thing, Serial Monitor tab is another. Watch this one for web server output like ip:
 http://192.168.86.30
 
-needs /api for now
-http://192.168.86.250/hi
+any request returns the webpage
+a request with /api/ returns the current servo state
+a request with /api/?state=true|false sets the server to open or close position
+a request with /api/?pos=[0:180] sets the servo to that position
+http://192.168.86.250/api/?state=true
  
  */
 
