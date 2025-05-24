@@ -21,9 +21,12 @@ http://192.168.86.250/api/?state=true
 // #include <vector>
 
 Servo myservo;  // Create a servo object
-int openPosition = 179;
-int closedPosition = 1;
+int openPosition = 20;
+int closedPosition = 180;
 bool currentState = false;
+int currentPos = 0;
+int servoStep = 1; // how many degrees per step
+int servoDelay = 20;
 
 const int servoPin = 21;  // Define the GPIO pin connected to the servo signal wire
 
@@ -31,15 +34,12 @@ const char* ssid = "Marmalade";
 const char* password = "100%Minnie!!";
 
 String serverAddress;
-
-
 WiFiServer server(80);
 
 void setup()
 {
     Serial.begin(115200);
     delay(10);
-    myservo.attach(servoPin);  // Attach the servo to the specified pin
     WiFi.begin(ssid, password); // We start by connecting to a WiFi network
 
     while (WiFi.status() != WL_CONNECTED) {
@@ -48,38 +48,57 @@ void setup()
     }
 
     serverAddress = WiFi.localIP().toString();
-    Serial.println("\nDogDoor connected to " + String(ssid) + " " + serverAddress);
+    Serial.println("\n\nDogDoor connected to " + String(ssid) + " " + serverAddress);
     
     server.begin();
+    showCurrentPos();
+}
 
-    int currentPos = myservo.read();
-    Serial.print("Current pos = ");
-    Serial.println(currentPos);
-    Serial.println("state: "+ String(currentState));
+void attachServo() {
+  if (!myservo.attached()) {
+    myservo.attach(servoPin);
+  }
+}
+
+void showCurrentPos() {
+   Serial.println("Current pos = " + String(currentPos) + " state: "+ String(currentState));
+}
+
+void calibrateServo() {
+  moveServo(90);
+  moveServo(0);
+
+}
+
+void moveServo(int pos) {
+  attachServo();
+  myservo.write(pos);
+  delay(servoDelay);  // wait for things to settle - maybe?
+  currentPos = pos; // record this as we cant rely on servo.read()
+  showCurrentPos();
 }
 
 /**
 Move the servo to the specified position slowly
 */
 void moveServoSlowly(int endPos) {
-  if (!myservo.attached()) {
-    myservo.attach(servoPin);
-  }
+    attachServo();
  
-    int startPos = myservo.read();
+    int startPos = currentPos;
     int pos = startPos;
     pos = constrain(pos, 0, 180);
-    int step = (endPos > startPos) ? 1 : -1;
+    int step = (endPos > startPos) ? servoStep : -servoStep;
     
-    while (pos != endPos) {
-        pos += step;
-        myservo.write(pos);
-        delay(15);  // Adjust this delay to control speed (higher = slower)
+    while (abs(pos - endPos) > servoStep) {
+      pos += step;
+      moveServo(pos);
     }
     // After servo movement is complete:
-    delay(1000);  // Give time for servo to reach position
+    //delay(100);  // Give time for servo to reach position
+    showCurrentPos();
     myservo.detach();
 }
+
 
 
 // returns a query param eg state=true as a string
@@ -219,7 +238,7 @@ void handleClient(WiFiClient client) {
   unsigned long startTime = millis();
 
   while (client.connected()) {  
-    if (millis() - startTime > 500) {  // Timeout after .5 seconds
+    if (millis() - startTime > 5000) {  // Timeout after .5 seconds
       Serial.println("Timeout waiting for client data.");
       break;
     }
@@ -260,7 +279,7 @@ void handleClient(WiFiClient client) {
               if (currentState) {
                 moveServoSlowly(openPosition);
               } else {
-                moveServoSlowly(closePosition);
+                moveServoSlowly(closedPosition);
               }
             }
           }
