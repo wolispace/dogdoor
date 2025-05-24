@@ -1,6 +1,9 @@
 /*
  WiFi Web Server control a servo motor
 
+Additional steps if still jittering 
+[] Adding a capacitor (100-470μF) between power and ground near the servo
+[] Ensuring your power supply can handle the servo's current requirements
 
 output tab is one thing, Serial Monitor tab is another. Watch this one for web server output like ip:
 http://192.168.86.30
@@ -55,6 +58,28 @@ void setup()
     Serial.println("state: "+ String(currentState));
 }
 
+/**
+Move the servo to the specified position slowly
+*/
+void moveServoSlowly(int endPos) {
+  if (!myservo.attached()) {
+    myservo.attach(servoPin);
+  }
+ 
+    int startPos = myservo.read();
+    int pos = startPos;
+    pos = constrain(pos, 0, 180);
+    int step = (endPos > startPos) ? 1 : -1;
+    
+    while (pos != endPos) {
+        pos += step;
+        myservo.write(pos);
+        delay(15);  // Adjust this delay to control speed (higher = slower)
+    }
+    // After servo movement is complete:
+    delay(1000);  // Give time for servo to reach position
+    myservo.detach();
+}
 
 
 // returns a query param eg state=true as a string
@@ -222,9 +247,7 @@ void handleClient(WiFiClient client) {
             String pos = getParameter(currentLine, "pos");
             if (!pos.isEmpty()) {
               int newPos = atoi(pos.c_str()); // Convert string to integer
-              myservo.write(newPos);
-              delay(500);
-              Serial.println("set new pos: " + String(newPos));
+              moveServoSlowly(newPos);
             }
 
             String state = getParameter(currentLine, "state");
@@ -235,13 +258,10 @@ void handleClient(WiFiClient client) {
               //Serial.println("set new time: " + time);
               currentState = state == "true";
               if (currentState) {
-                myservo.write(openPosition);
-                Serial.println("set new pos: " + String(openPosition));
+                moveServoSlowly(openPosition);
               } else {
-                myservo.write(closedPosition);
-                 Serial.println("set new pos: " + String(closedPosition));
+                moveServoSlowly(closePosition);
               }
-               delay(10);
             }
           }
           currentLine = "";  
