@@ -41,7 +41,20 @@ const int servoPin = 21;  // Define the GPIO pin connected to the servo signal w
 const char* ssid = "Marmalade";
 const char* password = "100%Minnie!!";
 
-const char* timers = "22:00=CLOSED,06:00=OPEN";
+struct ScheduledEvent {
+  int hours;
+  int minutes;
+  const char* action;
+};
+
+// hard-coded schedule
+ScheduledEvent events[] = {
+  {22, 0, "CLOSED"},
+  {6, 0, "OPEN"}
+};
+
+const int numEvents = sizeof(events) / sizeof(events[0]);
+
 
 String serverAddress;
 WiFiServer server(80);
@@ -331,11 +344,7 @@ void handleClient(WiFiClient client) {
             Serial.printf("Set state %s time: %02d:%02d\n", state, hours, mins);
             if (!state.isEmpty()) { 
               currentState = state == "true";
-              if (currentState) {
-                moveServoSlowly(openPosition);
-              } else {
-                moveServoSlowly(closedPosition);
-              }
+              updateServoToState();
             }
           }
           currentLine = "";  
@@ -351,16 +360,28 @@ void handleClient(WiFiClient client) {
   Serial.println("Client Disconnected. state: "+ String(currentState));
 }
 
+void updateServoToState() {
+  if (currentState) {
+    moveServoSlowly(openPosition);
+  } else {
+    moveServoSlowly(closedPosition);
+  }
+}
+
 void checkTime() {
     // updateTimeFromAPI(); // get the latest time 
     incrementTime();
     Serial.printf("time: %02d:%02d\n", hours, mins);
+    for (int i = 0; i < numEvents; i++) {
+    if (events[i].hours == hours && events[i].minutes == mins) {
+       currentState = events[i].action == "OPEN";
+       updateServoToState();
+       return; // Exit after finding a match
+    }
+  }
 }
 
-
-
 void loop() {
-
   unsigned long currentMillis = millis();
   if (currentMillis - lastCheckMillis >= timerInterval) {
     lastCheckMillis = currentMillis;
