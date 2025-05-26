@@ -18,20 +18,30 @@ http://192.168.86.250/api/?state=true
 
 #include <WiFi.h>
 #include <ESP32Servo.h>  // Include the ESP32Servo library
+#include <HTTPClient.h> // for fetching the time from a seb service
+
 // #include <vector>
 
 Servo myservo;  // Create a servo object
-int openPosition = 20;
-int closedPosition = 180;
+int openPosition = 30;
+int closedPosition = 175;
 bool currentState = false;
 int currentPos = 0;
-int servoStep = 1; // how many degrees per step
-int servoDelay = 20;
+int servoStep = 2; // how many degrees per step
+int servoDelay = 10;
+unsigned long startMillis = millis(); // for counting minutes
+int hours = 0;  // holds 24hr hours
+int mins = 0; // hold 60 min mins
+const char* timeApiUrl = "http://worldtimeapi.org/api/timezone/Etc/UTC"; // Change to your timezone
+int timerInterval = 1000 * 60 * 1; // check every 15mins to update time or run scheduled events 
+int lastCheckMillis = 0;
 
 const int servoPin = 21;  // Define the GPIO pin connected to the servo signal wire
 
 const char* ssid = "Marmalade";
 const char* password = "100%Minnie!!";
+
+const char* timers = "22:00=CLOSED,06:00=OPEN";
 
 String serverAddress;
 WiFiServer server(80);
@@ -52,6 +62,49 @@ void setup()
     
     server.begin();
     showCurrentPos();
+    startMillis = millis(); // Reset to the current time
+    checkTime();
+}
+
+void incrementTime() {
+  if (millis() - startMillis >= 60000) { // 60 seconds in milliseconds
+    startMillis = millis(); // Reset to the current time
+    
+    mins++;
+    
+    if (mins == 60) {
+      mins = 0;
+      hours++;
+      
+      if (hours == 24) {
+        hours = 0;
+      }
+    }
+  }
+}
+
+void updateTimeFromAPI() {
+  HTTPClient http;
+  http.begin(timeApiUrl);
+  
+  int httpResponseCode = http.GET();
+  if (httpResponseCode > 0) {
+    String response = http.getString();
+    Serial.println("Response: " + response);
+
+    // Extract time using simple string parsing (better to use JSON library)
+    int timeIndex = response.indexOf("\"datetime\":\"") + 11;
+    String timeString = response.substring(timeIndex, timeIndex + 5); // Format: HH:MM
+    
+    hours = timeString.substring(0, 2).toInt();
+    mins = timeString.substring(3, 5).toInt();
+    
+    Serial.printf("Updated time: %02d:%02d\n", hours, mins);
+  } else {
+    Serial.printf("No response from %s\n", timeApiUrl);
+  }
+
+  http.end();
 }
 
 void attachServo() {
@@ -215,8 +268,8 @@ void sendHtmlResponse(WiFiClient &client) {
         const door = new Door();                               \
         const button = document.querySelector('.button');      \
         button.addEventListener('click', () => door.toggle()); \
-        setInterval(() => door.getState(), 30000);             \
-      });                                                      \
+        setInterval(() => door.getState(), 3000);             \
+      });                                                     \
 </script>";
   client.println(script);
   client.println("<body> \
@@ -270,11 +323,13 @@ void handleClient(WiFiClient client) {
             }
 
             String state = getParameter(currentLine, "state");
+            String timeString = getParameter(currentLine, "time");
+            if (!timeString.isEmpty()) {
+              hours = timeString.substring(0, 2).toInt();
+              mins = timeString.substring(3, 5).toInt();
+            }
+            Serial.printf("Set state %s time: %02d:%02d\n", state, hours, mins);
             if (!state.isEmpty()) { 
-              String time = getParameter(currentLine, "time");
-
-              Serial.println("set new state: " + state);
-              //Serial.println("set new time: " + time);
               currentState = state == "true";
               if (currentState) {
                 moveServoSlowly(openPosition);
@@ -296,7 +351,22 @@ void handleClient(WiFiClient client) {
   Serial.println("Client Disconnected. state: "+ String(currentState));
 }
 
+void checkTime() {
+    // updateTimeFromAPI(); // get the latest time 
+    incrementTime();
+    Serial.printf("time: %02d:%02d\n", hours, mins);
+}
+
+
+
 void loop() {
+
+  unsigned long currentMillis = millis();
+  if (currentMillis - lastCheckMillis >= timerInterval) {
+    lastCheckMillis = currentMillis;
+    checkTime();
+  }
+
   WiFiClient client = server.available();
   if (client) {
     handleClient(client);
