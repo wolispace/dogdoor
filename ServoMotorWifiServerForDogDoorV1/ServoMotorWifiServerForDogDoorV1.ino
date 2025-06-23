@@ -27,7 +27,7 @@ int openPosition = 0;
 int closedPosition = 180;
 bool currentState = false;
 int currentPos = 0;
-int servoStep = 2; // how many degrees per step
+int servoStep = 1; // how many degrees per step
 int servoDelay = 10;
 unsigned long startMillis = millis(); // for counting minutes
 int hours = 0;  // holds 24hr hours
@@ -152,16 +152,15 @@ void moveServoSlowly(int endPos) {
  
     int startPos = currentPos;
     int pos = startPos;
-    pos = constrain(pos, 0, 180);
     int step = (endPos > startPos) ? servoStep : -servoStep;
     
-    while (abs(pos - endPos) > servoStep) {
+    while (pos != endPos) {
       pos += step;
+      pos = constrain(pos, min(startPos, endPos), max(startPos, endPos));
       moveServo(pos);
     }
-    // After servo movement is complete:
-    //delay(100);  // Give time for servo to reach position
-    showCurrentPos();
+    
+    moveServo(endPos); // Ensure we reach exact position
     myservo.detach();
 }
 
@@ -298,7 +297,7 @@ void sendHtmlResponse(WiFiClient &client) {
 }
 
 void handleClient(WiFiClient client) {
-  Serial.println("New Client. state: "+ String(currentState)); 
+  // Serial.println("New Client. state: "+ String(currentState)); 
   String currentLine = "";    
   bool wasApiRequest = false;  
   unsigned long startTime = millis();
@@ -327,20 +326,13 @@ void handleClient(WiFiClient client) {
             if (spaceIndex != -1) {
               currentLine = currentLine.substring(0, spaceIndex);  
             }
-            Serial.println("Request Line: [" + currentLine + "]");  
+            // Serial.println("Request Line: [" + currentLine + "]");  
 
             String pos = getParameter(currentLine, "pos");
             if (!pos.isEmpty()) {
               int newPos = atoi(pos.c_str()); // Convert string to integer
-              moveServoSlowly(newPos);
-            }
-
-            String p = getParameter(currentLine, "p");
-            if (!p.isEmpty()) {
-              int newPos = atoi(p.c_str()); // Convert string to integer
               moveServo(newPos);
             }
-
 
             String state = getParameter(currentLine, "state");
             String timeString = getParameter(currentLine, "time");
@@ -364,14 +356,14 @@ void handleClient(WiFiClient client) {
   client.flush();
   delay(10);
   client.stop();  
-  Serial.println("Client Disconnected. state: "+ String(currentState));
+  // Serial.println("Client Disconnected. state: "+ String(currentState));
 }
 
 void updateServoToState() {
   if (currentState) {
-    moveServo(openPosition);
+    moveServoSlowly(openPosition);
   } else {
-    moveServo(closedPosition);
+    moveServoSlowly(closedPosition);
   }
 }
 

@@ -1,0 +1,26 @@
+// Alternative servo control with configurable speed
+void moveServoSmoothly(int endPos, int stepSize = 1, int delayMs = 15) {
+    attachServo();
+    
+    int step = (endPos > currentPos) ? stepSize : -stepSize;
+    
+    while (currentPos != endPos) {
+        currentPos += step;
+        
+        // Prevent overshooting
+        if ((step > 0 && currentPos > endPos) || (step < 0 && currentPos < endPos)) {
+            currentPos = endPos;
+        }
+        
+        myservo.write(currentPos);
+        delay(delayMs);
+    }
+    
+    showCurrentPos();
+    myservo.detach();
+}
+
+// Usage examples:
+// moveServoSmoothly(0);        // Default: 1 degree steps, 15ms delay
+// moveServoSmoothly(180, 2, 20); // 2 degree steps, 20ms delay (slower)
+// moveServoSmoothly(90, 1, 5);   // 1 degree steps, 5ms delay (faster)
