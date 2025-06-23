@@ -23,8 +23,8 @@ http://192.168.86.250/api/?state=true
 // #include <vector>
 
 Servo myservo;  // Create a servo object
-int openPosition = 30;
-int closedPosition = 175;
+int openPosition = 0;
+int closedPosition = 180;
 bool currentState = false;
 int currentPos = 0;
 int servoStep = 2; // how many degrees per step
@@ -335,6 +335,13 @@ void handleClient(WiFiClient client) {
               moveServoSlowly(newPos);
             }
 
+            String p = getParameter(currentLine, "p");
+            if (!p.isEmpty()) {
+              int newPos = atoi(p.c_str()); // Convert string to integer
+              moveServo(newPos);
+            }
+
+
             String state = getParameter(currentLine, "state");
             String timeString = getParameter(currentLine, "time");
             if (!timeString.isEmpty()) {
@@ -362,9 +369,9 @@ void handleClient(WiFiClient client) {
 
 void updateServoToState() {
   if (currentState) {
-    moveServoSlowly(openPosition);
+    moveServo(openPosition);
   } else {
-    moveServoSlowly(closedPosition);
+    moveServo(closedPosition);
   }
 }
 
