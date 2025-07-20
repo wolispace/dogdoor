@@ -26,6 +26,9 @@ Servo myservo;  // Create a servo object
 int openPosition = 0;
 int closedPosition = 180;
 bool currentState = false;
+String currentInfo = "";
+String nextEvent = "";
+String lastEvent = "";
 int currentPos = 0;
 int servoStep = 1; // how many degrees per step
 int servoDelay = 10;
@@ -47,10 +50,10 @@ struct ScheduledEvent {
   const char* action;
 };
 
-// hard-coded schedule
+// hard-coded schedule chronological order
 ScheduledEvent events[] = {
-  {22, 0, "CLOSED"},
-  {6, 0, "OPEN"}
+  {6, 0, "OPEN"},
+  {22, 0, "CLOSED"}
 };
 
 const int numEvents = sizeof(events) / sizeof(events[0]);
@@ -183,7 +186,7 @@ void sendJsonResponse(WiFiClient &client) {
   client.println("HTTP/1.1 200 OK");
   client.println("Content-type:application/json");
   client.println();
-  client.println("{\"state\": \""+ String(currentState) + "\"}");
+  client.println("{\"state\":\""+ String(currentState) + "\",\"info\":\"" + currentInfo + "\"}");
   client.println();
 }
 // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
@@ -194,7 +197,7 @@ void sendHtmlResponse(WiFiClient &client) {
   client.println("Content-Type: text/html");
   client.println("Connection: close");
   client.println();
-  String style = "<style>body{background-color:darkslategray;display:flex;justify-content:center;align-items:center;} .button{position:relative;width:100px;height:100px;cursor:hand;} .hole{position:absolute;width:100%;height:100%;background-color:rgba(0,0,0,0.8);border-radius:10px;} .door{position:absolute;width:100%;height:100%;background-color:rgb(171,113,75);border-radius:10px;border-top:1px solid white;border-left:1px solid rgba(255,255,255,0.5);border-bottom:1px solid rgba(0,0,0,0.8);border-right:1px solid rgba(0,0,0,0.5);transition:transform 0.5s ease-in-out;} .open{transform:translateX(-100%);} .closed{transform:rotateY(-180deg);}</style>";
+  String style = "<style>body{background-color:darkslategray;display:flex;justify-content:center;align-items:center;} .button{position:relative;width:100px;height:100px;cursor:hand;} .hole{position:absolute;width:100%;height:100%;background-color:rgba(0,0,0,0.8);border-radius:10px;} .door{position:absolute;width:100%;height:100%;background-color:rgb(171,113,75);border-radius:10px;border-top:1px solid white;border-left:1px solid rgba(255,255,255,0.5);border-bottom:1px solid rgba(0,0,0,0.8);border-right:1px solid rgba(0,0,0,0.5);transition:transform 0.5s ease-in-out;} .open{transform:translateX(-100%);} .closed{transform:rotateY(-180deg);} .info{position:absolute;top:1rem;left:1rem;color:white;}</style>";
 
   // the content of the HTTP response follows the header:
   client.println("<html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\"></head>");
@@ -212,21 +215,30 @@ void sendHtmlResponse(WiFiClient &client) {
         };                                                 \
  \
         getState() {                           \
-          const data = fetch(this.url)         \
+          const data = fetch(this.url + `?time=${this.getTime()}`) \
             .then(response => response.json()) \
             .then(data => {                    \
               console.log(data);               \
               this.setState(data.state);       \
+              this.showInfo(data.info);         \
             })                                 \
             .catch(error => {                                     \
               console.error('Error fetching door state:', error); \
             });                                                   \
             this.showState();                                     \
         };                                                        \
+\        
+        getTime() { \                                              \                                         
+          const now = new Date();                                 \
+          const hours = String(now.getHours()).padStart(2, '0');  \
+          const mins = String(now.getMinutes()).padStart(2, '0'); \
+          return `${hours}:${mins}`;                              \
+        };                                                        \ 
+\
         setPos(pos) { \
           const data = fetch(this.url + `?pos=${pos}`); \
-        } \
- \
+        }; \
+\
         writeState() {                               \
           const data = { state: this.state };        \
           fetch(this.url + `?state=${this.state}`, { \
@@ -236,19 +248,19 @@ void sendHtmlResponse(WiFiClient &client) {
             },                                       \
           })                                         \
           .then(response => response.json())         \
-          .then(reply => {                                       \
+          .then(reply => {                                        \
             console.log('State sent successfully:', data, reply); \
           })                                                      \
           .catch(error => {                                     \
             console.error('Error updating door state:', error); \
           });                                                   \
         };                                                      \
- \
+\
         setState(state) {               \
           this.state = parseInt(state); \
           this.showState();             \
         };                              \
- \
+\
         showState() {       \
           if (this.state) { \
             this.open();    \
@@ -256,35 +268,42 @@ void sendHtmlResponse(WiFiClient &client) {
             this.close();   \
           }                 \
         };                  \
- \
+\
+        showInfo(info) {    \
+          const infoElement = document.querySelector('.info'); \
+          infoElement.innerHTML=info; \
+        } \
+\
         open() {                                \
           /*this.state = true;*/                \
           this.door.classList.remove('closed'); \
           this.door.classList.add('open');      \
         };                                      \
- \
+\
         close() {                             \
           /*this.state = false;*/             \
           this.door.classList.remove('open'); \
           this.door.classList.add('closed');  \
         };                                    \
- \
+\
         toggle() {                  \
           this.state = !this.state; \
           this.showState();         \
           this.writeState();        \
         };                          \
       };                            \
- \
+\
       document.addEventListener('DOMContentLoaded', () => {    \
         const door = new Door();                               \
         const button = document.querySelector('.button');      \
         button.addEventListener('click', () => door.toggle()); \
-        setInterval(() => door.getState(), 3000);             \
-      });                                                     \
+        setInterval(() => door.getState(), 3000);              \
+      });                                                      \
 </script>";
   client.println(script);
   client.println("<body> \
+  <div class='info'>   \
+  </div>               \
   <div class='button'> \
     <div class='hole'> \
     </div> \
@@ -303,7 +322,7 @@ void handleClient(WiFiClient client) {
   unsigned long startTime = millis();
 
   while (client.connected()) {  
-    if (millis() - startTime > 5000) {  // Timeout after .5 seconds
+    if (millis() - startTime > 3000) {  // Timeout after .5 seconds
       Serial.println("Timeout waiting for client data.");
       break;
     }
@@ -368,17 +387,38 @@ void updateServoToState() {
 }
 
 void checkTime() {
-    // updateTimeFromAPI(); // get the latest time 
-    incrementTime();
-    Serial.printf("time: %02d:%02d\n", hours, mins);
-    for (int i = 0; i < numEvents; i++) {
-    if (events[i].hours == hours && events[i].minutes == mins) {
-       currentState = events[i].action == "OPEN";
-       updateServoToState();
-       return; // Exit after finding a match
+  incrementTime();
+  currentInfo = makeTimeString(hours, mins);
+  int nowTotal = hours * 60 + mins;
+
+  Serial.printf("time: %s\n", currentInfo);
+  nextEvent = "none";
+  for (int i = 0; i < numEvents; i++) {
+    int eventTotal = events[i].hours * 60 + events[i].minutes;
+    // no next event then set it to the next upcomming event
+    if (nextEvent == "none" && nowTotal < eventTotal) {
+      nextEvent = makeTimeString(events[i].hours, events[i].minutes);
+    }
+
+    // exact hour and minue match so change state
+    if (nowTotal == eventTotal && lastEvent != currentInfo) {
+      currentState = events[i].action == "OPEN";
+      lastEvent = currentInfo;
+      updateServoToState();
     }
   }
+    // Wrap to first event if none found
+  if (nextEvent == "none") {
+    nextEvent = makeTimeString(events[0].hours, events[0].minutes);;
+  }
+  currentInfo = currentInfo + " next=" + nextEvent;
 }
+
+// converts hrs am mins to zero padded hh:mm eg 01:08
+String makeTimeString(int hrs, int mins) {
+ return (hrs < 10 ? "0" : "") + String(hrs) + ":" + (mins < 10 ? "0" : "") + String(mins);
+}
+
 
 void loop() {
   unsigned long currentMillis = millis();
